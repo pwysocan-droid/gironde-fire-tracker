@@ -3,8 +3,8 @@
 import { useEffect, useRef } from "react";
 import maplibregl from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
-import { BBOX, FIRE_CENTROID } from "@/lib/constants";
-import type { FireData, WindData } from "@/lib/types";
+import { BBOX, BOD, FIRE_CENTROID } from "@/lib/constants";
+import type { FireData, TrafficData, WindData } from "@/lib/types";
 
 /**
  * Carto Positron raster tiles. Raster (not vector) keeps the dependency surface
@@ -44,6 +44,56 @@ const EMPTY: GeoJSON.FeatureCollection = {
   type: "FeatureCollection",
   features: [],
 };
+
+/**
+ * Aircraft glyph as an ImageData triangle. Drawn on a canvas rather than loaded
+ * as an SVG because MapLibre's addImage takes raw pixels reliably, and this
+ * keeps the whole map dependency-free beyond maplibre-gl itself.
+ *
+ * Drawn pointing up (north); the symbol layer rotates it to true_track.
+ */
+function triangleImage(fill: string, ratio = 2): ImageData | null {
+  const s = 18 * ratio;
+  const cv = document.createElement("canvas");
+  cv.width = s;
+  cv.height = s;
+  const g = cv.getContext("2d");
+  if (!g) return null;
+
+  g.clearRect(0, 0, s, s);
+  g.beginPath();
+  g.moveTo(s / 2, 2 * ratio);
+  g.lineTo(s - 4 * ratio, s - 3 * ratio);
+  g.lineTo(s / 2, s - 6.5 * ratio);
+  g.lineTo(4 * ratio, s - 3 * ratio);
+  g.closePath();
+  g.fillStyle = fill;
+  g.fill();
+  // Hairline in ground colour so triangles stay countable when they overlap.
+  g.strokeStyle = "#F4F2EC";
+  g.lineWidth = 0.8 * ratio;
+  g.stroke();
+
+  return g.getImageData(0, 0, s, s);
+}
+
+function trafficGeoJson(traffic: TrafficData | null): GeoJSON.FeatureCollection {
+  if (!traffic) return EMPTY;
+  return {
+    type: "FeatureCollection",
+    features: traffic.aircraft
+      .filter((a) => !a.onGround)
+      .map((a) => ({
+        type: "Feature" as const,
+        geometry: { type: "Point" as const, coordinates: [a.lon, a.lat] },
+        properties: {
+          callsign: a.callsign,
+          track: a.track ?? 0,
+          fire: a.firefighter ? 1 : 0,
+        },
+      })),
+  };
+}
 
 function fireGeoJson(fire: FireData | null): GeoJSON.FeatureCollection {
   if (!fire) return EMPTY;
@@ -98,14 +148,17 @@ function barbElement(from: number, speed: number, gust: number): HTMLElement {
 export default function FireMap({
   fire,
   wind,
+  traffic,
 }: {
   fire: FireData | null;
   wind: WindData | null;
+  traffic: TrafficData | null;
 }) {
   const holder = useRef<HTMLDivElement>(null);
   const map = useRef<maplibregl.Map | null>(null);
   const ready = useRef(false);
   const barb = useRef<maplibregl.Marker | null>(null);
+  const labels = useRef<maplibregl.Marker[]>([]);
 
   useEffect(() => {
     if (!holder.current || map.current) return;
@@ -197,6 +250,63 @@ export default function FireMap({
         },
       });
 
+      // Bordeaux-Mérignac: air-traffic anchor only. Its 21 July fire is
+      // resolved and is deliberately not drawn as a fire feature.
+      m.addSource("bod", {
+        type: "geojson",
+        data: {
+          type: "FeatureCollection",
+          features: [
+            {
+              type: "Feature",
+              geometry: { type: "Point", coordinates: [BOD.lon, BOD.lat] },
+              properties: {},
+            },
+          ],
+        },
+      });
+      m.addLayer({
+        id: "bod-ring",
+        type: "circle",
+        source: "bod",
+        paint: {
+          "circle-radius": 4,
+          "circle-color": "transparent",
+          "circle-stroke-width": 1,
+          "circle-stroke-color": "#0A0A08",
+          "circle-stroke-opacity": 0.55,
+        },
+      });
+
+      const neutral = triangleImage("rgba(10,10,8,0.62)");
+      const hot = triangleImage(ACCENT);
+      if (neutral) m.addImage("ac-neutral", neutral, { pixelRatio: 2 });
+      if (hot) m.addImage("ac-fire", hot, { pixelRatio: 2 });
+
+      m.addSource("traffic", { type: "geojson", data: EMPTY });
+      m.addLayer({
+        id: "traffic-dots",
+        type: "symbol",
+        source: "traffic",
+        layout: {
+          "icon-image": [
+            "case",
+            ["==", ["get", "fire"], 1],
+            "ac-fire",
+            "ac-neutral",
+          ],
+          "icon-rotate": ["get", "track"],
+          "icon-rotation-alignment": "map",
+          "icon-allow-overlap": true,
+          "icon-size": [
+            "case",
+            ["==", ["get", "fire"], 1],
+            1.05,
+            0.72,
+          ],
+        },
+      });
+
       ready.current = true;
       const src = m.getSource("fire") as maplibregl.GeoJSONSource | undefined;
       src?.setData(fireGeoJson(fire));
@@ -220,6 +330,39 @@ export default function FireMap({
     const src = m.getSource("fire") as maplibregl.GeoJSONSource | undefined;
     src?.setData(fireGeoJson(fire));
   }, [fire]);
+
+  // Aircraft positions, refreshed every poll. Firefighters additionally get a
+  // DOM label so the callsign is readable in Plex Mono — a visible PELICAN
+  // shuttling basin-to-fireline is the whole point of this layer.
+  useEffect(() => {
+    const m = map.current;
+    if (!m || !ready.current) return;
+
+    const src = m.getSource("traffic") as maplibregl.GeoJSONSource | undefined;
+    src?.setData(trafficGeoJson(traffic));
+
+    for (const l of labels.current) l.remove();
+    labels.current = [];
+
+    for (const a of traffic?.aircraft ?? []) {
+      if (!a.firefighter || a.onGround) continue;
+      const el = document.createElement("div");
+      el.className = "ac-label";
+      el.textContent = a.callsign;
+      labels.current.push(
+        new maplibregl.Marker({ element: el, anchor: "left" })
+          .setLngLat([a.lon, a.lat])
+          .addTo(m),
+      );
+    }
+  }, [traffic]);
+
+  useEffect(() => {
+    return () => {
+      for (const l of labels.current) l.remove();
+      labels.current = [];
+    };
+  }, []);
 
   // Wind barb sits on the live FRP-weighted centroid when we have one, so it
   // tracks the fire as the front moves rather than sitting on a fixed pin.
@@ -269,6 +412,21 @@ export default function FireMap({
             style={{ background: "rgba(10,10,8,0.3)" }}
           />
           <span className="label">FEU &gt; 24 H</span>
+        </div>
+        <div
+          className="legend-row"
+          style={{ marginTop: 3, paddingTop: 5, borderTop: "1px solid rgba(10,10,8,0.12)" }}
+        >
+          <svg width="9" height="9" viewBox="0 0 9 9" aria-hidden="true">
+            <polygon points="4.5,0 9,9 4.5,6.6 0,9" fill={ACCENT} />
+          </svg>
+          <span className="label">SÉCURITÉ CIVILE</span>
+        </div>
+        <div className="legend-row">
+          <svg width="9" height="9" viewBox="0 0 9 9" aria-hidden="true">
+            <polygon points="4.5,0 9,9 4.5,6.6 0,9" fill="rgba(10,10,8,0.62)" />
+          </svg>
+          <span className="label">AUTRE TRAFIC</span>
         </div>
       </div>
     </>

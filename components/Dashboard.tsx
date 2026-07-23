@@ -1,13 +1,14 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Clock from "./Clock";
 import FireMap from "./FireMap";
 import FireModule from "./FireModule";
 import WindModule from "./WindModule";
-import Module from "./Module";
+import TrafficModule from "./TrafficModule";
 import Freshness from "./Freshness";
 import { useSource } from "@/lib/useSource";
-import type { FireData, WindData } from "@/lib/types";
+import type { FireData, TrafficData, WindData } from "@/lib/types";
 
 /**
  * Owns every data source and hands each one to exactly one module. Sources are
@@ -16,6 +17,8 @@ import type { FireData, WindData } from "@/lib/types";
 export default function Dashboard() {
   const fire = useSource<FireData>("/api/fire", 5 * 60 * 1000);
   const wind = useSource<WindData>("/api/wind", 10 * 60 * 1000);
+  // 60 s to match the route cache; anonymous OpenSky is credit-limited.
+  const traffic = useSource<TrafficData>("/api/traffic", 60 * 1000);
 
   // A single ticking clock drives every relative "age" label on the page, so
   // they all advance together instead of drifting per-component.
@@ -27,18 +30,34 @@ export default function Dashboard() {
 
   return (
     <>
-      <Freshness
-        sources={[
-          { key: "FEU", state: fire },
-          { key: "VENT", state: wind },
-          { key: "TRAFIC", state: null },
-        ]}
-        now={now}
-      />
+      <header className="masthead">
+        <div className="masthead-title">
+          <h1>
+            Suivi Feu <span className="accent">/</span> Gironde
+          </h1>
+          <div className="masthead-sub">
+            <div className="label">INCENDIE ACTIF — LÈGE-CAP-FERRET</div>
+            <div className="label dim" style={{ marginTop: 4 }}>
+              44.75°N 1.20°O · BASSIN D&apos;ARCACHON · NOUVELLE-AQUITAINE
+            </div>
+          </div>
+        </div>
+        <div className="masthead-clock">
+          <Clock />
+          <Freshness
+            sources={[
+              { key: "FEU", state: fire },
+              { key: "VENT", state: wind },
+              { key: "TRAFIC", state: traffic },
+            ]}
+            now={now}
+          />
+        </div>
+      </header>
 
       <div className="main">
         <div className="col-map">
-          <FireMap fire={fire.data} wind={wind.data} />
+          <FireMap fire={fire.data} wind={wind.data} traffic={traffic.data} />
         </div>
 
         <div className="col-modules">
@@ -46,9 +65,7 @@ export default function Dashboard() {
 
           <WindModule src={wind} />
 
-          <Module num="03" title="TRAFIC AÉRIEN" meta="OPENSKY" grow>
-            <div className="label dim">EN ATTENTE DE DONNÉES</div>
-          </Module>
+          <TrafficModule src={traffic} />
         </div>
       </div>
     </>

@@ -1,6 +1,5 @@
 import Clock from "@/components/Clock";
-import FireMap from "@/components/FireMap";
-import Module from "@/components/Module";
+import Dashboard from "@/components/Dashboard";
 
 export default function Page() {
   return (
@@ -22,25 +21,7 @@ export default function Page() {
         </div>
       </header>
 
-      <div className="main">
-        <div className="col-map">
-          <FireMap />
-        </div>
-
-        <div className="col-modules">
-          <Module num="01" title="FEU" meta="NASA FIRMS">
-            <div className="label dim">EN ATTENTE DE DONNÉES</div>
-          </Module>
-
-          <Module num="02" title="VENT" meta="OPEN-METEO">
-            <div className="label dim">EN ATTENTE DE DONNÉES</div>
-          </Module>
-
-          <Module num="03" title="TRAFIC AÉRIEN" meta="OPENSKY" grow>
-            <div className="label dim">EN ATTENTE DE DONNÉES</div>
-          </Module>
-        </div>
-      </div>
+      <Dashboard />
 
       <footer className="footer">
         <span className="label dim">SOURCES</span>

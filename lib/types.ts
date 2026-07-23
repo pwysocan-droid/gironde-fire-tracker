@@ -86,13 +86,20 @@ export type Aircraft = {
   track: number | null;
   verticalRate: number | null;
   onGround: boolean;
-  country: string;
+  /**
+   * Whatever the provider can tell us about the airframe: an ICAO type code
+   * from adsb.lol ("DH8D"), or the origin country from OpenSky. Providers
+   * expose different things, so this is deliberately loose.
+   */
+  descriptor: string;
   /** Set when the callsign matches a Sécurité Civile prefix. */
   firefighter: { type: string; role: string } | null;
 };
 
 export type TrafficData = {
   aircraft: Aircraft[];
+  /** Which upstream actually answered — surfaced in the module header. */
+  provider: string;
   firefighterCount: number;
   /** Aircraft within BOD_RADIUS_KM of BOD and below BOD_CEILING_M. */
   bodTraffic: number;

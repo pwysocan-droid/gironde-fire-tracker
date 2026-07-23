@@ -16,7 +16,7 @@ export default function TrafficModule({ src }: { src: SourceState<TrafficData> }
     <Module
       num="03"
       title="TRAFIC AÉRIEN"
-      meta={d ? `${d.total} APPAREILS` : "OPENSKY"}
+      meta={d ? `${d.total} APPAREILS · ${d.provider}` : "TRAFIC"}
       down={down}
       detail={src.error ?? undefined}
       grow
@@ -78,8 +78,8 @@ export default function TrafficModule({ src }: { src: SourceState<TrafficData> }
                         {a.firefighter
                           ? a.firefighter.type
                           : a.onGround
-                            ? "au sol"
-                            : a.country}
+                            ? `${a.descriptor || "—"} · au sol`
+                            : a.descriptor || "—"}
                       </td>
                       <td className="num-cell">
                         {a.onGround

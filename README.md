@@ -34,7 +34,7 @@ called from the client, so no key ever reaches the browser.
 | --- | --- | --- | --- |
 | 01 FEU | `/api/fire` | NASA FIRMS (VIIRS NOAA-20, NOAA-21, MODIS) | 10 min |
 | 02 VENT | `/api/wind` | Open-Meteo forecast + air quality | 15 min |
-| 03 TRAFIC AÉRIEN | `/api/traffic` | OpenSky Network | 60 s |
+| 03 TRAFIC AÉRIEN | `/api/traffic` | adsb.lol (primary), OpenSky (fallback) | 60 s |
 
 Each module fails independently: a source going down greys out only its own
 frame and shows `SOURCE INDISPONIBLE`, and the last good payload stays on
@@ -47,12 +47,26 @@ Copy `.env.local.example` to `.env.local`.
 - `FIRMS_MAP_KEY` — **required** for module 01. Free, instant email signup at
   https://firms.modaps.eosdis.nasa.gov/api/. Also set it in Vercel under
   Project Settings → Environment Variables.
-- `OPENSKY_CLIENT_ID` / `OPENSKY_CLIENT_SECRET` — optional. Anonymous OpenSky
-  access works but is limited to roughly 400 credits/day; registering an
-  OAuth2 client at https://opensky-network.org/my-opensky raises that. The
-  route falls back to anonymous when these are absent.
+- `OPENSKY_CLIENT_ID` / `OPENSKY_CLIENT_SECRET` — optional, and only useful
+  where OpenSky is reachable (see below). Anonymous access works but is
+  limited to roughly 400 credits/day.
 
-Open-Meteo needs no key.
+Open-Meteo and adsb.lol need no key.
+
+### Why module 03 is not on OpenSky
+
+OpenSky was the brief's air-traffic source, and it works from a laptop. It
+does not work from Vercel: every OpenSky host TCP-times-out from Vercel's
+egress (`UND_ERR_CONNECT_TIMEOUT`, ~10.5 s) while Open-Meteo answers in 83 ms
+from the same function. OAuth2 credentials cannot fix it — `auth.opensky-
+network.org` is unreachable too, so no token can be obtained — and calling it
+from the browser instead is blocked by OpenSky's CORS policy, which allows
+only its own origin.
+
+So `/api/traffic` uses **adsb.lol** (free, no key, community ADS-B) as the
+primary source and falls back to OpenSky automatically where it is reachable.
+The live module header names whichever provider answered. adsb.lol also
+reports the ICAO airframe type, which OpenSky does not.
 
 ```bash
 npm install
@@ -73,6 +87,11 @@ machine default points at an internal registry that requires VPN.
   bare-soil and industrial false positives around the estuary.
 - Open-Meteo returns unzoned Europe/Paris wall-clock timestamps; the 24 h
   strip is aligned against a Paris wall-clock key, never a UTC instant.
+- Firefighting aircraft are flagged by Sécurité Civile callsign prefix
+  (PELICAN, MILAN, DRAGON, BENGAL) *and*, where the provider reports one, by
+  airframe type. Callsign alone is not enough: on this fire the Air Tractor
+  AT-802 water bombers were working the fire line as TRACTA/TRACTC/TRACKE,
+  which match no Sécurité Civile prefix.
 - Wind direction is reported as the direction wind comes *from*. The fire is
   driven toward `direction + 180`, which is what the arrow and the
   plain-language reading both show.
@@ -80,6 +99,6 @@ machine default points at an internal registry that requires VPN.
 
 ## Attribution
 
-NASA FIRMS · Open-Meteo · OpenSky Network · basemap © OpenStreetMap
-contributors © CARTO. FIRMS and OpenSky both require attribution; it is in
-the page footer.
+NASA FIRMS · Open-Meteo · adsb.lol · OpenSky Network · basemap © OpenStreetMap
+contributors © CARTO. FIRMS and OpenSky both require attribution; all sources
+are credited in the page footer.

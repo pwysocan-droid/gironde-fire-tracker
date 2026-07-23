@@ -22,6 +22,11 @@ export default function Page() {
           </a>
         </span>
         <span className="label">
+          <a href="https://adsb.lol/" target="_blank" rel="noreferrer">
+            ADSB.LOL
+          </a>
+        </span>
+        <span className="label">
           <a
             href="https://opensky-network.org/"
             target="_blank"

@@ -39,6 +39,24 @@ export const FIREFIGHTER_PREFIXES = [
   { prefix: "BENGAL", type: "Beech King Air", role: "RECONNAISSANCE" },
 ] as const;
 
+/**
+ * ICAO type codes for firefighting airframes, used when the provider reports a
+ * type. Callsign matching alone misses contracted operators: on this fire the
+ * Air Tractors were working the fire line as TRACTA/TRACTC/TRACKE, which match
+ * no Sécurité Civile prefix, but their AT8T type gives them away.
+ * Callsign remains authoritative where both are available.
+ */
+export const FIREFIGHTER_TYPES: Record<string, { type: string; role: string }> = {
+  AT8T: { type: "Air Tractor AT-802", role: "BOMBARDIER D'EAU" },
+  AT802: { type: "Air Tractor AT-802", role: "BOMBARDIER D'EAU" },
+  A802: { type: "Air Tractor AT-802", role: "BOMBARDIER D'EAU" },
+  CL41: { type: "Canadair CL-415", role: "BOMBARDIER D'EAU" },
+  CL2T: { type: "Canadair CL-215T", role: "BOMBARDIER D'EAU" },
+  CL21: { type: "Canadair CL-215", role: "BOMBARDIER D'EAU" },
+  DH8D: { type: "Dash 8 Q400MR", role: "BOMBARDIER D'EAU" },
+  S64: { type: "Erickson Air-Crane", role: "HÉLICOPTÈRE" },
+};
+
 export const CACHE = {
   firms: 600, // 10 min — satellites pass a few times daily
   meteo: 900, // 15 min

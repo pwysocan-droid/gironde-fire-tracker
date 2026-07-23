@@ -4,7 +4,7 @@ import { useEffect, useRef } from "react";
 import maplibregl from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
 import { BBOX, FIRE_CENTROID } from "@/lib/constants";
-import type { FireData } from "@/lib/types";
+import type { FireData, WindData } from "@/lib/types";
 
 /**
  * Carto Positron raster tiles. Raster (not vector) keeps the dependency surface
@@ -66,10 +66,46 @@ function fireGeoJson(fire: FireData | null): GeoJSON.FeatureCollection {
   };
 }
 
-export default function FireMap({ fire }: { fire: FireData | null }) {
+/**
+ * Wind barb pinned at the fire centroid, built as raw SVG markup so it can ride
+ * inside a MapLibre DOM marker without a React root. Points the way the fire is
+ * being driven (from + 180), with the speed in km/h set beside the shaft.
+ */
+function barbElement(from: number, speed: number, gust: number): HTMLElement {
+  const heading = (from + 180) % 360;
+  const el = document.createElement("div");
+  el.style.pointerEvents = "none";
+  el.innerHTML = `
+<svg width="86" height="86" viewBox="0 0 86 86" aria-hidden="true">
+  <circle cx="43" cy="43" r="27" fill="none" stroke="${ACCENT}"
+          stroke-opacity="0.5" stroke-width="1" stroke-dasharray="2 3"/>
+  <g transform="rotate(${heading} 43 43)">
+    <line x1="43" y1="62" x2="43" y2="24" stroke="${ACCENT}" stroke-width="2.4"/>
+    <polygon points="43,16 37,29 49,29" fill="${ACCENT}"/>
+  </g>
+  <circle cx="43" cy="43" r="2.4" fill="${ACCENT}"/>
+</svg>
+<div style="position:absolute;left:50%;top:100%;transform:translate(-50%,2px);
+            background:${ACCENT};color:#F4F2EC;font-family:var(--mono);
+            font-size:9px;font-weight:600;letter-spacing:0.06em;
+            padding:1px 4px 2px;white-space:nowrap;">
+  ${Math.round(speed)}/${Math.round(gust)} KM/H
+</div>`;
+  el.style.position = "relative";
+  return el;
+}
+
+export default function FireMap({
+  fire,
+  wind,
+}: {
+  fire: FireData | null;
+  wind: WindData | null;
+}) {
   const holder = useRef<HTMLDivElement>(null);
   const map = useRef<maplibregl.Map | null>(null);
   const ready = useRef(false);
+  const barb = useRef<maplibregl.Marker | null>(null);
 
   useEffect(() => {
     if (!holder.current || map.current) return;
@@ -184,6 +220,30 @@ export default function FireMap({ fire }: { fire: FireData | null }) {
     const src = m.getSource("fire") as maplibregl.GeoJSONSource | undefined;
     src?.setData(fireGeoJson(fire));
   }, [fire]);
+
+  // Wind barb sits on the live FRP-weighted centroid when we have one, so it
+  // tracks the fire as the front moves rather than sitting on a fixed pin.
+  useEffect(() => {
+    const m = map.current;
+    if (!m || !wind) return;
+
+    const at = fire?.centroid ?? FIRE_CENTROID;
+    barb.current?.remove();
+    barb.current = new maplibregl.Marker({
+      element: barbElement(
+        wind.current.direction,
+        wind.current.speed,
+        wind.current.gust,
+      ),
+    })
+      .setLngLat([at.lon, at.lat])
+      .addTo(m);
+
+    return () => {
+      barb.current?.remove();
+      barb.current = null;
+    };
+  }, [wind, fire?.centroid]);
 
   return (
     <>

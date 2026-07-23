@@ -3,10 +3,11 @@
 import { useEffect, useState } from "react";
 import FireMap from "./FireMap";
 import FireModule from "./FireModule";
+import WindModule from "./WindModule";
 import Module from "./Module";
 import Freshness from "./Freshness";
 import { useSource } from "@/lib/useSource";
-import type { FireData } from "@/lib/types";
+import type { FireData, WindData } from "@/lib/types";
 
 /**
  * Owns every data source and hands each one to exactly one module. Sources are
@@ -14,6 +15,7 @@ import type { FireData } from "@/lib/types";
  */
 export default function Dashboard() {
   const fire = useSource<FireData>("/api/fire", 5 * 60 * 1000);
+  const wind = useSource<WindData>("/api/wind", 10 * 60 * 1000);
 
   // A single ticking clock drives every relative "age" label on the page, so
   // they all advance together instead of drifting per-component.
@@ -28,7 +30,7 @@ export default function Dashboard() {
       <Freshness
         sources={[
           { key: "FEU", state: fire },
-          { key: "VENT", state: null },
+          { key: "VENT", state: wind },
           { key: "TRAFIC", state: null },
         ]}
         now={now}
@@ -36,15 +38,13 @@ export default function Dashboard() {
 
       <div className="main">
         <div className="col-map">
-          <FireMap fire={fire.data} />
+          <FireMap fire={fire.data} wind={wind.data} />
         </div>
 
         <div className="col-modules">
           <FireModule src={fire} now={now} />
 
-          <Module num="02" title="VENT" meta="OPEN-METEO">
-            <div className="label dim">EN ATTENTE DE DONNÉES</div>
-          </Module>
+          <WindModule src={wind} />
 
           <Module num="03" title="TRAFIC AÉRIEN" meta="OPENSKY" grow>
             <div className="label dim">EN ATTENTE DE DONNÉES</div>

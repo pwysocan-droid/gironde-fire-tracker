@@ -53,6 +53,14 @@ Copy `.env.local.example` to `.env.local`.
 
 Open-Meteo and adsb.lol need no key.
 
+```bash
+npm install
+npm run dev
+```
+
+Note: `.npmrc` pins this project to the public npm registry, since the
+machine default points at an internal registry that requires VPN.
+
 ### Why module 03 is not on OpenSky
 
 OpenSky was the brief's air-traffic source, and it works from a laptop. It
@@ -68,13 +76,6 @@ primary source and falls back to OpenSky automatically where it is reachable.
 The live module header names whichever provider answered. adsb.lol also
 reports the ICAO airframe type, which OpenSky does not.
 
-```bash
-npm install
-npm run dev
-```
-
-Note: `.npmrc` pins this project to the public npm registry, since the
-machine default points at an internal registry that requires VPN.
 
 ## Notes on the data
 

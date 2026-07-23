@@ -1,0 +1,576 @@
+/* ============================================================
+   GIRONDE FIRE TRACKER — design system
+   ground #F4F2EC / ink #0A0A08 / accent #E8280A
+   No gradients. No shadows. No rounded corners.
+   ============================================================ */
+
+:root {
+  --ground: #f4f2ec;
+  --ink: #0a0a08;
+  --accent: #e8280a;
+
+  --ink-60: rgba(10, 10, 8, 0.6);
+  --ink-30: rgba(10, 10, 8, 0.3);
+  --ink-12: rgba(10, 10, 8, 0.12);
+
+  --mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+  --display: "Barlow Condensed", "Oswald", Impact, sans-serif;
+
+  --rule: 1px solid var(--ink);
+  --hairline: 1px solid var(--ink-12);
+  --frame: 2px;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  background: var(--ground);
+  color: var(--ink);
+  font-family: var(--mono);
+  font-size: 13px;
+  line-height: 1.35;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Tabular figures everywhere — numbers must align in columns. */
+body {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" 1, "zero" 1;
+}
+
+/* ---------- primitives ---------- */
+
+.label {
+  font-family: var(--mono);
+  font-size: 9px;
+  font-weight: 500;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  line-height: 1;
+}
+
+.dim {
+  color: var(--ink-60);
+}
+
+.accent {
+  color: var(--accent);
+}
+
+.num {
+  font-family: var(--display);
+  font-weight: 600;
+  line-height: 0.86;
+  letter-spacing: -0.01em;
+}
+
+/* ---------- page frame ---------- */
+
+.frame {
+  border: var(--frame) solid var(--ink);
+  min-height: 100vh;
+  height: 100vh;
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  overflow: hidden;
+}
+
+/* ---------- masthead ---------- */
+
+.masthead {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: stretch;
+  border-bottom: var(--rule);
+}
+
+.masthead-title {
+  padding: 10px 12px 8px;
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  flex-wrap: wrap;
+  min-width: 0;
+}
+
+.masthead-title h1 {
+  font-family: var(--display);
+  font-weight: 700;
+  font-size: 34px;
+  line-height: 0.84;
+  letter-spacing: -0.005em;
+  text-transform: uppercase;
+  margin: 0;
+}
+
+.masthead-sub {
+  border-left: var(--hairline);
+  padding-left: 12px;
+  max-width: 34ch;
+}
+
+.masthead-clock {
+  border-left: var(--rule);
+  padding: 10px 12px 8px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 6px;
+  text-align: right;
+  align-items: flex-end;
+  white-space: nowrap;
+}
+
+.clock-time {
+  font-family: var(--display);
+  font-weight: 600;
+  font-size: 30px;
+  line-height: 0.84;
+  letter-spacing: 0.01em;
+}
+
+/* freshness row under the clock */
+.freshness {
+  display: flex;
+  gap: 10px;
+}
+
+.fresh-item {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.fresh-dot {
+  width: 6px;
+  height: 6px;
+  background: var(--ink);
+  flex: none;
+}
+
+.fresh-dot.stale {
+  background: var(--ink-30);
+}
+
+.fresh-dot.down {
+  background: var(--accent);
+}
+
+/* ---------- main grid: 60 / 40 ---------- */
+
+.main {
+  display: grid;
+  grid-template-columns: 60fr 40fr;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.col-map {
+  position: relative;
+  border-right: var(--rule);
+  min-height: 0;
+  min-width: 0;
+}
+
+.col-modules {
+  display: grid;
+  grid-template-rows: auto auto 1fr;
+  min-height: 0;
+  min-width: 0;
+  overflow-y: auto;
+}
+
+/* ---------- module ---------- */
+
+.module {
+  border-bottom: var(--rule);
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.module:last-child {
+  border-bottom: none;
+}
+
+.module-head {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 7px 12px;
+  border-bottom: var(--hairline);
+}
+
+.module-num {
+  font-family: var(--mono);
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+}
+
+.module-title {
+  font-family: var(--mono);
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.module-meta {
+  margin-left: auto;
+  font-size: 9px;
+  letter-spacing: 0.08em;
+  color: var(--ink-60);
+  text-transform: uppercase;
+}
+
+.module-body {
+  padding: 10px 12px 12px;
+  min-height: 0;
+}
+
+/* a module whose source failed */
+.module.down .module-body {
+  opacity: 0.42;
+}
+
+.source-down {
+  padding: 18px 12px;
+  text-align: left;
+}
+
+.source-down .label {
+  color: var(--accent);
+}
+
+/* ---------- stat row ---------- */
+
+.stats {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: 1fr;
+}
+
+.stat {
+  border-left: var(--hairline);
+  padding-left: 8px;
+}
+
+.stat:first-child {
+  border-left: none;
+  padding-left: 0;
+}
+
+.stat-val {
+  font-family: var(--display);
+  font-weight: 600;
+  font-size: 42px;
+  line-height: 0.82;
+  letter-spacing: -0.015em;
+  display: block;
+  margin-bottom: 5px;
+}
+
+.stat-val.sm {
+  font-size: 30px;
+}
+
+.stat-unit {
+  font-size: 9px;
+  letter-spacing: 0.1em;
+  color: var(--ink-60);
+  text-transform: uppercase;
+}
+
+/* ---------- footer ---------- */
+
+.footer {
+  border-top: var(--rule);
+  padding: 6px 12px;
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+  align-items: baseline;
+}
+
+.footer a {
+  color: var(--ink);
+  text-decoration: none;
+  border-bottom: 1px solid var(--ink-30);
+}
+
+.footer a:hover {
+  border-bottom-color: var(--ink);
+}
+
+/* ---------- map ---------- */
+
+.map {
+  position: absolute;
+  inset: 0;
+}
+
+/* Desaturate the basemap to near-monochrome so data layers carry all colour. */
+.map .maplibregl-canvas {
+  filter: grayscale(1) contrast(0.82) brightness(1.06);
+}
+
+.maplibregl-ctrl-attrib,
+.maplibregl-ctrl-logo {
+  display: none !important;
+}
+
+.map-overlay {
+  position: absolute;
+  z-index: 2;
+  pointer-events: none;
+}
+
+.map-legend {
+  left: 0;
+  bottom: 0;
+  background: var(--ground);
+  border-top: var(--rule);
+  border-right: var(--rule);
+  padding: 7px 10px 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.legend-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.legend-swatch {
+  width: 9px;
+  height: 9px;
+  flex: none;
+  border-radius: 50%;
+}
+
+.map-scalebar {
+  right: 0;
+  bottom: 0;
+  background: var(--ground);
+  border-top: var(--rule);
+  border-left: var(--rule);
+  padding: 6px 9px 7px;
+}
+
+.scalebar-line {
+  height: 4px;
+  border: 1px solid var(--ink);
+  border-top: none;
+  margin-top: 3px;
+}
+
+/* aircraft callsign labels drawn as DOM markers */
+.ac-label {
+  font-family: var(--mono);
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  background: var(--accent);
+  color: var(--ground);
+  padding: 1px 3px 2px;
+  white-space: nowrap;
+  transform: translate(9px, -50%);
+  pointer-events: none;
+}
+
+/* ---------- tables ---------- */
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 11px;
+}
+
+.table th {
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  text-align: left;
+  padding: 0 6px 4px 0;
+  border-bottom: var(--rule);
+  color: var(--ink-60);
+  white-space: nowrap;
+}
+
+.table td {
+  padding: 3px 6px 3px 0;
+  border-bottom: var(--hairline);
+  white-space: nowrap;
+}
+
+.table th:last-child,
+.table td:last-child {
+  padding-right: 0;
+}
+
+.table tr.firefighter td {
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.table-scroll {
+  overflow-y: auto;
+  min-height: 0;
+}
+
+.num-cell {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---------- wind ---------- */
+
+.wind-current {
+  display: grid;
+  grid-template-columns: 74px 1fr;
+  gap: 12px;
+  align-items: center;
+}
+
+.wind-readout {
+  border-left: var(--hairline);
+  padding: 8px 0 8px 10px;
+  margin-top: 10px;
+  font-size: 11px;
+  line-height: 1.4;
+}
+
+.wind-strip {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(0, 1fr);
+  border-top: var(--rule);
+  margin-top: 10px;
+  overflow-x: auto;
+}
+
+.wind-hour {
+  border-right: var(--hairline);
+  padding: 5px 3px 6px;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  min-width: 0;
+}
+
+.wind-hour:last-child {
+  border-right: none;
+}
+
+.wind-hour-label {
+  font-size: 8px;
+  letter-spacing: 0.06em;
+  color: var(--ink-60);
+}
+
+.wind-hour-spd {
+  font-size: 10px;
+  font-weight: 600;
+}
+
+.wind-hour-gust {
+  font-size: 9px;
+  color: var(--ink-60);
+}
+
+.wind-hour.now {
+  background: var(--ink);
+  color: var(--ground);
+}
+
+.wind-hour.now .wind-hour-label,
+.wind-hour.now .wind-hour-gust {
+  color: rgba(244, 242, 236, 0.66);
+}
+
+/* ---------- air quality ---------- */
+
+.aq {
+  display: flex;
+  gap: 14px;
+  margin-top: 10px;
+  padding-top: 9px;
+  border-top: var(--hairline);
+}
+
+.aq-item {
+  display: flex;
+  align-items: baseline;
+  gap: 5px;
+}
+
+.aq-val {
+  font-family: var(--display);
+  font-weight: 600;
+  font-size: 20px;
+  line-height: 1;
+}
+
+/* ---------- mobile: columns collapse vertically ---------- */
+
+@media (max-width: 860px) {
+  .frame {
+    height: auto;
+    min-height: 100vh;
+    overflow: visible;
+  }
+
+  .masthead {
+    grid-template-columns: 1fr;
+  }
+
+  .masthead-clock {
+    border-left: none;
+    border-top: var(--hairline);
+    text-align: left;
+    align-items: flex-start;
+    flex-direction: row;
+    justify-content: space-between;
+    flex-wrap: wrap;
+  }
+
+  .masthead-sub {
+    border-left: none;
+    padding-left: 0;
+    flex-basis: 100%;
+    max-width: none;
+  }
+
+  .main {
+    grid-template-columns: 1fr;
+    overflow: visible;
+  }
+
+  .col-map {
+    border-right: none;
+    border-bottom: var(--rule);
+    height: 62vh;
+    min-height: 320px;
+  }
+
+  .col-modules {
+    overflow-y: visible;
+  }
+
+  .stat-val {
+    font-size: 34px;
+  }
+}

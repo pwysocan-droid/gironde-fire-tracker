@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef } from "react";
 import maplibregl from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
 import { BBOX, BOD, FIRE_CENTROID } from "@/lib/constants";
@@ -8,8 +8,13 @@ import type { FireData, TrafficData, WindData } from "@/lib/types";
 
 /**
  * Carto Positron raster tiles. Raster (not vector) keeps the dependency surface
- * to maplibre-gl alone, and the CSS grayscale filter on .maplibregl-canvas
- * pushes it to near-monochrome so the data layers carry all the colour.
+ * to maplibre-gl alone.
+ *
+ * Desaturation happens here in the style, via raster-saturation, and NOT as a
+ * CSS filter on the canvas: MapLibre draws the basemap and every data layer
+ * into one WebGL canvas, so a CSS grayscale filter greys out the fire dots and
+ * aircraft along with the map. Doing it on the raster layer leaves the data
+ * layers as the only source of colour on the page.
  */
 const BASEMAP: maplibregl.StyleSpecification = {
   version: 8,
@@ -31,7 +36,11 @@ const BASEMAP: maplibregl.StyleSpecification = {
       id: "positron",
       type: "raster",
       source: "positron",
-      paint: { "raster-opacity": 0.82 },
+      paint: {
+        "raster-opacity": 0.72,
+        "raster-saturation": -1,
+        "raster-contrast": -0.12,
+      },
     },
   ],
 };
@@ -160,6 +169,28 @@ export default function FireMap({
   const barb = useRef<maplibregl.Marker | null>(null);
   const labels = useRef<maplibregl.Marker[]>([]);
 
+  // The mount effect's `load` handler would otherwise close over the props
+  // from the first render — both null — while the data effects bail out
+  // because `ready` is still false. Whichever order the race resolves in, the
+  // layers end up empty. A ref that always holds the current payload lets the
+  // load handler read live data instead of a stale closure.
+  const latest = useRef<{ fire: FireData | null; traffic: TrafficData | null }>({
+    fire: null,
+    traffic: null,
+  });
+  latest.current = { fire, traffic };
+
+  const syncLayers = useCallback(() => {
+    const m = map.current;
+    if (!m || !ready.current) return;
+    (m.getSource("fire") as maplibregl.GeoJSONSource | undefined)?.setData(
+      fireGeoJson(latest.current.fire),
+    );
+    (m.getSource("traffic") as maplibregl.GeoJSONSource | undefined)?.setData(
+      trafficGeoJson(latest.current.traffic),
+    );
+  }, []);
+
   useEffect(() => {
     if (!holder.current || map.current) return;
 
@@ -180,6 +211,12 @@ export default function FireMap({
       "top-right",
     );
 
+    // Scale matters on a fire map: it is how you read the width of the front.
+    m.addControl(
+      new maplibregl.ScaleControl({ maxWidth: 96, unit: "metric" }),
+      "bottom-right",
+    );
+
     m.on("load", () => {
       m.addSource("fire", { type: "geojson", data: EMPTY });
 
@@ -189,11 +226,13 @@ export default function FireMap({
         id: "fire-heat",
         type: "circle",
         source: "fire",
-        filter: ["<=", ["get", "bucket"], 1],
+        // Only the live front gets a wash; washing 24 h of history as well
+        // just produces one dark halo with no shape to it.
+        filter: ["==", ["get", "bucket"], 0],
         paint: {
           "circle-color": ACCENT,
           "circle-blur": 1,
-          "circle-opacity": ["case", ["==", ["get", "bucket"], 0], 0.2, 0.09],
+          "circle-opacity": 0.16,
           "circle-radius": [
             "interpolate",
             ["linear"],
@@ -210,6 +249,11 @@ export default function FireMap({
         id: "fire-dots",
         type: "circle",
         source: "fire",
+        layout: {
+          // Draw newest last so the live front sits on top of its own history
+          // instead of being buried under two days of older returns.
+          "circle-sort-key": ["-", 2, ["get", "bucket"]],
+        },
         paint: {
           "circle-color": [
             "case",
@@ -217,13 +261,15 @@ export default function FireMap({
             ACCENT,
             "#0A0A08",
           ],
+          // Older strata sit well back: at this fire's density a 0.6-opacity
+          // 24 h layer merges into one solid mass with no countable marks.
           "circle-opacity": [
             "case",
             ["==", ["get", "bucket"], 0],
-            0.95,
+            0.92,
             ["==", ["get", "bucket"], 1],
-            0.6,
-            0.3,
+            0.34,
+            0.16,
           ],
           "circle-radius": [
             "interpolate",
@@ -232,21 +278,28 @@ export default function FireMap({
             8,
             [
               "interpolate", ["linear"], ["get", "frp"],
-              0, 1.6, 10, 2.6, 50, 4, 150, 5.6, 500, 7.5,
+              0, 1.1, 10, 1.9, 50, 3, 150, 4.2, 500, 5.8,
             ],
             12,
             [
               "interpolate", ["linear"], ["get", "frp"],
-              0, 3, 10, 5, 50, 8, 150, 12, 500, 17,
+              0, 2.4, 10, 4, 50, 6.5, 150, 9.5, 500, 14,
             ],
           ],
+          // Ground-colour hairline keeps overlapping marks countable.
           "circle-stroke-width": [
             "case",
             ["==", ["get", "bucket"], 0],
-            0.75,
-            0,
+            0.7,
+            0.35,
           ],
           "circle-stroke-color": "#F4F2EC",
+          "circle-stroke-opacity": [
+            "case",
+            ["==", ["get", "bucket"], 0],
+            0.9,
+            0.3,
+          ],
         },
       });
 
@@ -308,13 +361,35 @@ export default function FireMap({
       });
 
       ready.current = true;
-      const src = m.getSource("fire") as maplibregl.GeoJSONSource | undefined;
-      src?.setData(fireGeoJson(fire));
+      syncLayers();
     });
 
     map.current = m;
 
+    // The map is constructed before CSS grid has resolved the column's height,
+    // so MapLibre sizes its canvas to a near-zero box and the basemap renders
+    // as a strip across the top. Observe the container and resize + refit once
+    // real dimensions land, and on every later layout change.
+    let fitted = false;
+    const ro = new ResizeObserver((entries) => {
+      const box = entries[0]?.contentRect;
+      if (!box || box.width < 2 || box.height < 2) return;
+      m.resize();
+      if (!fitted) {
+        fitted = true;
+        m.fitBounds(
+          [
+            [BBOX.lonMin, BBOX.latMin],
+            [BBOX.lonMax, BBOX.latMax],
+          ],
+          { padding: 24, duration: 0 },
+        );
+      }
+    });
+    ro.observe(holder.current);
+
     return () => {
+      ro.disconnect();
       ready.current = false;
       m.remove();
       map.current = null;
@@ -325,11 +400,8 @@ export default function FireMap({
 
   // Push new detections into the existing source without touching the camera.
   useEffect(() => {
-    const m = map.current;
-    if (!m || !ready.current) return;
-    const src = m.getSource("fire") as maplibregl.GeoJSONSource | undefined;
-    src?.setData(fireGeoJson(fire));
-  }, [fire]);
+    syncLayers();
+  }, [fire, syncLayers]);
 
   // Aircraft positions, refreshed every poll. Firefighters additionally get a
   // DOM label so the callsign is readable in Plex Mono — a visible PELICAN
@@ -338,8 +410,7 @@ export default function FireMap({
     const m = map.current;
     if (!m || !ready.current) return;
 
-    const src = m.getSource("traffic") as maplibregl.GeoJSONSource | undefined;
-    src?.setData(trafficGeoJson(traffic));
+    syncLayers();
 
     for (const l of labels.current) l.remove();
     labels.current = [];
@@ -355,7 +426,7 @@ export default function FireMap({
           .addTo(m),
       );
     }
-  }, [traffic]);
+  }, [traffic, syncLayers]);
 
   useEffect(() => {
     return () => {

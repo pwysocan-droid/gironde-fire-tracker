@@ -312,15 +312,21 @@ body {
 
 /* ---------- map ---------- */
 
-.map {
+/* maplibre-gl.css is injected after this file and sets
+   `.maplibregl-map { position: relative }`, which beats a bare `.map` rule at
+   equal specificity — the container then collapses to the height of its zoom
+   controls. Qualify the selector to outrank it, and set explicit dimensions so
+   sizing survives regardless of which position value wins. */
+.col-map .map {
   position: absolute;
   inset: 0;
+  width: 100%;
+  height: 100%;
 }
 
-/* Desaturate the basemap to near-monochrome so data layers carry all colour. */
-.map .maplibregl-canvas {
-  filter: grayscale(1) contrast(0.82) brightness(1.06);
-}
+/* Basemap desaturation lives in the style JSON (raster-saturation), not here:
+   MapLibre shares one canvas between the basemap and the data layers, so a CSS
+   filter would grey out the fire dots and aircraft too. */
 
 .maplibregl-ctrl-attrib,
 .maplibregl-ctrl-logo {
@@ -358,20 +364,43 @@ body {
   border-radius: 50%;
 }
 
-.map-scalebar {
-  right: 0;
-  bottom: 0;
-  background: var(--ground);
-  border-top: var(--rule);
-  border-left: var(--rule);
-  padding: 6px 9px 7px;
+/* MapLibre's default controls ship rounded corners and a drop shadow; both are
+   out of bounds here. Square them off and put them on the page palette. */
+.maplibregl-ctrl-group {
+  background: var(--ground) !important;
+  border: 1px solid var(--ink) !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
 }
 
-.scalebar-line {
-  height: 4px;
-  border: 1px solid var(--ink);
-  border-top: none;
-  margin-top: 3px;
+.maplibregl-ctrl-group button {
+  border-radius: 0 !important;
+  background: var(--ground);
+  width: 26px;
+  height: 26px;
+}
+
+.maplibregl-ctrl-group button + button {
+  border-top: 1px solid var(--ink-12) !important;
+}
+
+.maplibregl-ctrl-group button:hover {
+  background: rgba(10, 10, 8, 0.06);
+}
+
+.maplibregl-ctrl-scale {
+  background: var(--ground) !important;
+  border: 1px solid var(--ink) !important;
+  border-top: none !important;
+  border-radius: 0 !important;
+  font-family: var(--mono) !important;
+  font-size: 9px !important;
+  font-weight: 500;
+  letter-spacing: 0.1em;
+  color: var(--ink);
+  padding: 2px 5px 3px !important;
+  margin: 0 !important;
+  box-shadow: none !important;
 }
 
 /* aircraft callsign labels drawn as DOM markers */
@@ -522,6 +551,13 @@ body {
   font-weight: 600;
   font-size: 20px;
   line-height: 1;
+}
+
+/* Units must not be uppercased: text-transform turns the micro sign into a
+   capital Mu, which reads as "MG/M³" — off by a factor of a thousand. */
+.unit {
+  text-transform: none;
+  letter-spacing: 0.06em;
 }
 
 /* ---------- mobile: columns collapse vertically ---------- */

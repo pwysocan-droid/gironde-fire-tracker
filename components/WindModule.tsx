@@ -112,13 +112,13 @@ export default function WindModule({ src }: { src: SourceState<WindData> }) {
                 <span className="aq-val">
                   {d.air.pm25 !== null ? nnn(d.air.pm25) : "—"}
                 </span>
-                <span className="label dim">PM2.5 µg/m³</span>
+                <span className="label dim unit">PM2.5 µg/m³</span>
               </div>
               <div className="aq-item">
                 <span className="aq-val">
                   {d.air.pm10 !== null ? nnn(d.air.pm10) : "—"}
                 </span>
-                <span className="label dim">PM10 µg/m³</span>
+                <span className="label dim unit">PM10 µg/m³</span>
               </div>
             </div>
           ) : null}

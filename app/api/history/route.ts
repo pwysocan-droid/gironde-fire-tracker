@@ -1,16 +1,22 @@
 import { NextResponse } from "next/server";
-import { selectRows, supabaseConfigured } from "@/lib/supabase";
+import { readHistory, supabaseConfigured } from "@/lib/supabase";
+import { takeSnapshot } from "@/lib/snapshot";
 import { haversineKm } from "@/lib/format";
-import type { Envelope, HistoryData, Snapshot } from "@/lib/types";
-
-export const revalidate = 300; // history moves at 15-min cadence; 5 min is plenty
+import type { Envelope, HistoryData } from "@/lib/types";
 
 /**
  * Last 48 h of snapshots, plus a measured spread rate: centroid drift over
- * ~6 h. Six hours smooths satellite-pass jitter — consecutive 15-min rows
- * share the same detections between passes, so short-window drift is mostly
- * noise.
+ * ~6 h (six hours smooths satellite-pass jitter — consecutive 15-min rows
+ * share the same detections between passes, so short-window drift is noise).
+ *
+ * This route is also the primary snapshot trigger: when the newest row is
+ * stale it takes one before answering. Clients poll every 5 min, so history
+ * feeds itself while anyone is watching; the GitHub Actions cron is only the
+ * backstop for unwatched stretches.
  */
+
+export const dynamic = "force-dynamic";
+
 export async function GET() {
   const fetchedAt = new Date().toISOString();
 
@@ -25,11 +31,15 @@ export async function GET() {
   }
 
   try {
-    const since = new Date(Date.now() - 48 * 3600 * 1000).toISOString();
-    const snapshots = await selectRows<Snapshot>(
-      "gironde_snapshots",
-      `select=taken_at,detections_6h,detections_24h,total_frp,centroid_lat,centroid_lon,wind_speed,wind_gust,wind_dir,humidity,pm25,firefighters&taken_at=gte.${since}&order=taken_at.asc`,
-    );
+    // Opportunistic snapshot — the min-interval guard inside makes this a
+    // no-op most of the time. Its failure must never break reads.
+    try {
+      await takeSnapshot();
+    } catch {
+      /* history stays servable */
+    }
+
+    const snapshots = await readHistory();
 
     let spreadKmh: number | null = null;
     let spreadHeading: number | null = null;
@@ -37,7 +47,6 @@ export async function GET() {
     const latest = snapshots[snapshots.length - 1];
     if (latest?.centroid_lat != null && latest.centroid_lon != null) {
       const targetT = Date.parse(latest.taken_at) - 6 * 3600 * 1000;
-      // Oldest row within the 5–7 h window back — close enough to 6 h.
       const past = snapshots.find(
         (s) =>
           s.centroid_lat != null &&

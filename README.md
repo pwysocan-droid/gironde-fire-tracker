@@ -36,7 +36,7 @@ called from the client, so no key ever reaches the browser.
 | 02 VENT | `/api/wind` | Open-Meteo forecast + air quality | 15 min |
 | 03 TRAFIC AÉRIEN | `/api/traffic` | adsb.lol (primary), OpenSky (fallback) | 60 s |
 | 04 SITUATION | `/api/sitrep` | Claude (Anthropic API) over all sources | 15 min |
-| — historique | `/api/history` + `/api/snapshot` | Supabase (optional) | 5 min |
+| — historique | `/api/history` + `/api/snapshot` | Supabase Storage (optional) | 5 min |
 
 Each module fails independently: a source going down greys out only its own
 frame and shows `SOURCE INDISPONIBLE`, and the last good payload stays on
@@ -54,10 +54,14 @@ Copy `.env.local.example` to `.env.local`.
   most every 15 minutes; the module greys out without the key.
 - `SUPABASE_URL` / `SUPABASE_SERVICE_ROLE_KEY` / `SNAPSHOT_SECRET` — optional,
   enable the history features (sparklines, measured spread rate, trend in the
-  bulletin). Run `supabase/schema.sql` once in the project's SQL editor — it
-  creates the table and a pg_cron job that POSTs to `/api/snapshot` every
-  15 minutes (Vercel Hobby crons only fire daily, so the database schedules
-  its own feeding). Everything degrades gracefully while unset.
+  bulletin). Zero setup beyond the env vars: history lives in a private
+  Supabase **Storage** bucket (`gironde-fire`) holding one rolling 48 h JSON
+  document — the app creates the bucket lazily, so no SQL, no tables, and a
+  shared Supabase project is never touched beyond that bucket. Snapshots are
+  taken opportunistically by `/api/history` while anyone has the page open,
+  with a GitHub Actions cron (`.github/workflows/snapshot.yml`, every 30 min)
+  as backstop for unwatched stretches; a min-interval guard dedupes the two
+  triggers. Everything degrades gracefully while unset.
 - `OPENSKY_CLIENT_ID` / `OPENSKY_CLIENT_SECRET` — optional, and only useful
   where OpenSky is reachable (see below). Anonymous access works but is
   limited to roughly 400 credits/day.

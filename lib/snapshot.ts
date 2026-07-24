@@ -1,7 +1,7 @@
 import { GET as fireGET } from "@/app/api/fire/route";
 import { GET as windGET } from "@/app/api/wind/route";
 import { GET as trafficGET } from "@/app/api/traffic/route";
-import { appendSnapshot, readHistory, supabaseConfigured } from "./supabase";
+import { appendSnapshot, historyConfigured, readHistory } from "./store";
 import type {
   Envelope,
   FireData,
@@ -21,8 +21,8 @@ const MIN_INTERVAL_MS = 12 * 60 * 1000;
 export async function takeSnapshot(): Promise<
   { taken: true; at: string } | { taken: false; reason: string }
 > {
-  if (!supabaseConfigured()) {
-    return { taken: false, reason: "SUPABASE non configurée" };
+  if (!historyConfigured()) {
+    return { taken: false, reason: "historique non configuré (BLOB_READ_WRITE_TOKEN)" };
   }
 
   const existing = await readHistory();

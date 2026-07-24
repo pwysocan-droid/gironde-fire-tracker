@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { readHistory, supabaseConfigured } from "@/lib/supabase";
+import { historyConfigured, readHistory } from "@/lib/store";
 import { takeSnapshot } from "@/lib/snapshot";
 import { haversineKm } from "@/lib/format";
 import type { Envelope, HistoryData } from "@/lib/types";
@@ -20,7 +20,7 @@ export const dynamic = "force-dynamic";
 export async function GET() {
   const fetchedAt = new Date().toISOString();
 
-  if (!supabaseConfigured()) {
+  if (!historyConfigured()) {
     const body: Envelope<HistoryData> = {
       status: "down",
       fetchedAt,

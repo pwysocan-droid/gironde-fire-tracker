@@ -6,9 +6,10 @@ import FireMap from "./FireMap";
 import FireModule from "./FireModule";
 import WindModule from "./WindModule";
 import TrafficModule from "./TrafficModule";
+import SitrepModule from "./SitrepModule";
 import Freshness from "./Freshness";
 import { useSource } from "@/lib/useSource";
-import type { FireData, TrafficData, WindData } from "@/lib/types";
+import type { FireData, HistoryData, SitrepData, TrafficData, WindData } from "@/lib/types";
 
 /**
  * Owns every data source and hands each one to exactly one module. Sources are
@@ -19,6 +20,9 @@ export default function Dashboard() {
   const wind = useSource<WindData>("/api/wind", 10 * 60 * 1000);
   // 60 s to match the route cache; anonymous OpenSky is credit-limited.
   const traffic = useSource<TrafficData>("/api/traffic", 60 * 1000);
+  // Server regenerates at 15-min cadence; clients just pick up the new copy.
+  const history = useSource<HistoryData>("/api/history", 5 * 60 * 1000);
+  const sitrep = useSource<SitrepData>("/api/sitrep", 5 * 60 * 1000);
 
   // A single ticking clock drives every relative "age" label on the page, so
   // they all advance together instead of drifting per-component.
@@ -61,11 +65,13 @@ export default function Dashboard() {
         </div>
 
         <div className="col-modules">
-          <FireModule src={fire} now={now} />
+          <FireModule src={fire} history={history.data} now={now} />
 
           <WindModule src={wind} />
 
           <TrafficModule src={traffic} />
+
+          <SitrepModule src={sitrep} />
         </div>
       </div>
     </>

@@ -105,3 +105,40 @@ export type TrafficData = {
   bodTraffic: number;
   total: number;
 };
+
+/* ---------- history (Supabase) ---------- */
+
+/** One 15-minute aggregate row — small on purpose; raw detections stay upstream. */
+export type Snapshot = {
+  taken_at: string;
+  detections_6h: number;
+  detections_24h: number;
+  total_frp: number;
+  centroid_lat: number | null;
+  centroid_lon: number | null;
+  wind_speed: number | null;
+  wind_gust: number | null;
+  wind_dir: number | null;
+  humidity: number | null;
+  pm25: number | null;
+  firefighters: number | null;
+};
+
+export type HistoryData = {
+  snapshots: Snapshot[];
+  /** km/h of centroid drift measured over ~6 h, null until enough history. */
+  spreadKmh: number | null;
+  /** Degrees true of the drift, null with spreadKmh. */
+  spreadHeading: number | null;
+};
+
+/* ---------- 04 SITUATION ---------- */
+
+export type SitrepData = {
+  /** The French-language bulletin. */
+  bulletin: string;
+  /** Model that produced it, for the attribution line. */
+  model: string;
+  /** ISO UTC of generation. */
+  generatedAt: string;
+};

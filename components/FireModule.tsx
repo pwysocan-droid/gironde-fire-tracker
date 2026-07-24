@@ -1,15 +1,19 @@
 "use client";
 
 import Module from "./Module";
-import { age, nnn, parisTime } from "@/lib/format";
-import type { FireData } from "@/lib/types";
+import Sparkline from "./Sparkline";
+import { age, compass, nnn, parisTime } from "@/lib/format";
+import type { FireData, HistoryData } from "@/lib/types";
 import type { SourceState } from "@/lib/useSource";
 
 export default function FireModule({
   src,
+  history,
   now,
 }: {
   src: SourceState<FireData>;
+  /** Optional: sparklines + measured spread appear once history accumulates. */
+  history: HistoryData | null;
   now: number;
 }) {
   const d = src.data;
@@ -97,6 +101,52 @@ export default function FireModule({
               </div>
             ) : null}
           </div>
+
+          {history && history.snapshots.length >= 3 ? (
+            <div
+              style={{
+                marginTop: 11,
+                paddingTop: 9,
+                borderTop: "1px solid rgba(10,10,8,0.12)",
+                display: "flex",
+                gap: 18,
+                flexWrap: "wrap",
+                alignItems: "flex-end",
+              }}
+            >
+              <div>
+                <div className="label dim">PUISSANCE 48 H</div>
+                <div style={{ marginTop: 4 }}>
+                  <Sparkline
+                    values={history.snapshots.map((s) => s.total_frp)}
+                    accent
+                  />
+                </div>
+              </div>
+              <div>
+                <div className="label dim">DÉTECTIONS &lt;6 H</div>
+                <div style={{ marginTop: 4 }}>
+                  <Sparkline
+                    values={history.snapshots.map((s) => s.detections_6h)}
+                  />
+                </div>
+              </div>
+              {history.spreadKmh !== null && history.spreadHeading !== null ? (
+                <div>
+                  <div className="label dim">PROPAGATION MESURÉE 6 H</div>
+                  <div style={{ marginTop: 4, fontSize: 12 }}>
+                    <span className="accent" style={{ fontWeight: 600 }}>
+                      {nnn(history.spreadKmh, 2)} km/h
+                    </span>
+                    <span className="dim">
+                      {" "}
+                      vers {compass(history.spreadHeading)}
+                    </span>
+                  </div>
+                </div>
+              ) : null}
+            </div>
+          ) : null}
 
           {/* The counts breathe with the orbit, not only with the fire: no
               new detections can arrive between satellite passes, so the <6 h

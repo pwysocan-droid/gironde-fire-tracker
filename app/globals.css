@@ -180,11 +180,17 @@ body {
 }
 
 .col-modules {
-  display: grid;
-  grid-template-rows: auto auto 1fr;
+  /* Four modules exceed one viewport: stack naturally and let the column
+     scroll. A rigid grid here made rows overlap instead of overflowing. */
+  display: flex;
+  flex-direction: column;
   min-height: 0;
   min-width: 0;
   overflow-y: auto;
+}
+
+.col-modules > .module {
+  flex: none;
 }
 
 /* ---------- module ---------- */
@@ -494,6 +500,8 @@ body {
 .table-scroll {
   overflow-y: auto;
   min-height: 0;
+  /* In a scrolling column the table gets its own ceiling instead of a grow. */
+  max-height: 300px;
 }
 
 .num-cell {

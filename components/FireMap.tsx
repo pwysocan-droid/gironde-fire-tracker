@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import maplibregl from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
 import { BBOX, BOD, FIRE_CENTROID } from "@/lib/constants";
@@ -125,6 +125,195 @@ function fireGeoJson(fire: FireData | null): GeoJSON.FeatureCollection {
   };
 }
 
+/* ---------- wind-driven spread projection ---------- */
+
+const KM_PER_DEG_LAT = 111.32;
+
+/** Andrew's monotone chain. Points as [lon, lat]; returns the hull CCW. */
+function convexHull(points: [number, number][]): [number, number][] {
+  const pts = [...points].sort((a, b) => a[0] - b[0] || a[1] - b[1]);
+  if (pts.length <= 3) return pts;
+  const cross = (
+    o: [number, number],
+    a: [number, number],
+    b: [number, number],
+  ) => (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0]);
+
+  const lower: [number, number][] = [];
+  for (const p of pts) {
+    while (
+      lower.length >= 2 &&
+      cross(lower[lower.length - 2], lower[lower.length - 1], p) <= 0
+    )
+      lower.pop();
+    lower.push(p);
+  }
+  const upper: [number, number][] = [];
+  for (let i = pts.length - 1; i >= 0; i--) {
+    const p = pts[i];
+    while (
+      upper.length >= 2 &&
+      cross(upper[upper.length - 2], upper[upper.length - 1], p) <= 0
+    )
+      upper.pop();
+    upper.push(p);
+  }
+  lower.pop();
+  upper.pop();
+  return lower.concat(upper);
+}
+
+type Projection = {
+  fc: GeoJSON.FeatureCollection;
+  labels: { lngLat: [number, number]; text: string }[];
+};
+
+/**
+ * Greedy single-linkage clustering: points chained within `kmThresh` belong to
+ * one fire. Needed because the July 24 flare-up produced a second ignition
+ * ~20 km south of the main front — one convex hull over both spanned the
+ * whole Arcachon basin, which as a "projection" was worse than nothing.
+ */
+function clusterPoints(
+  pts: { lon: number; lat: number }[],
+  kmThresh = 4,
+): { lon: number; lat: number }[][] {
+  const n = pts.length;
+  const parent = Array.from({ length: n }, (_, i) => i);
+  const find = (i: number): number => {
+    while (parent[i] !== i) {
+      parent[i] = parent[parent[i]];
+      i = parent[i];
+    }
+    return i;
+  };
+
+  const midLat = pts.reduce((s, p) => s + p.lat, 0) / (n || 1);
+  const kx = KM_PER_DEG_LAT * Math.cos((midLat * Math.PI) / 180);
+  const t2 = kmThresh * kmThresh;
+
+  for (let i = 0; i < n; i++) {
+    for (let j = i + 1; j < n; j++) {
+      const dx = (pts[i].lon - pts[j].lon) * kx;
+      const dy = (pts[i].lat - pts[j].lat) * KM_PER_DEG_LAT;
+      if (dx * dx + dy * dy <= t2) {
+        const a = find(i);
+        const b = find(j);
+        if (a !== b) parent[a] = b;
+      }
+    }
+  }
+
+  const groups = new Map<number, { lon: number; lat: number }[]>();
+  for (let i = 0; i < n; i++) {
+    const r = find(i);
+    const g = groups.get(r);
+    if (g) g.push(pts[i]);
+    else groups.set(r, [pts[i]]);
+  }
+  return [...groups.values()];
+}
+
+/**
+ * Indicative 6 h spread envelope: the convex hull of the active front,
+ * advected hour by hour along the forecast wind and slightly inflated so the
+ * flanks widen as the head advances. Drawn at +2/+4/+6 h.
+ *
+ * This is deliberately crude and labelled INDICATIVE on the page: head rate of
+ * spread is taken as ~5 % of a gust-weighted wind speed (a common rule-of-
+ * thumb magnitude for wind-driven forest fire), halved when humidity is above
+ * 60 %. A real fire-behaviour model needs fuel moisture, fuel type and
+ * terrain, none of which this page has — the envelope answers "which way and
+ * roughly how far", never "exactly where".
+ */
+function windProjection(
+  fire: FireData | null,
+  wind: WindData | null,
+): Projection | null {
+  if (!fire || !wind || wind.hours.length === 0) return null;
+
+  const now = Date.now();
+  // Base the front on the freshest stratum available: the projection should
+  // start from where the fire is, not where it was yesterday.
+  let pts = fire.detections.filter(
+    (d) => now - Date.parse(d.acquiredAt) <= H6,
+  );
+  if (pts.length < 3)
+    pts = fire.detections.filter((d) => now - Date.parse(d.acquiredAt) <= H24);
+  if (pts.length < 3) return null;
+
+  // Each distinct fire gets its own hull and its own envelope; a single hull
+  // over separate ignitions produces one giant fan over everything between.
+  const clusters = clusterPoints(pts).filter((c) => c.length >= 5);
+  if (clusters.length === 0) return null;
+  clusters.sort((a, b) => b.length - a.length);
+
+  // The hourly drift vector is shared: same wind field over the whole bbox.
+  const drifts: { eastKm: number; northKm: number; hour: number }[] = [];
+  let eastKm = 0;
+  let northKm = 0;
+  wind.hours.slice(0, 6).forEach((h, i) => {
+    const damp = h.humidity >= 60 ? 0.5 : 1;
+    const ros = Math.max(0.3, 0.05 * (0.7 * h.speed + 0.3 * h.gust)) * damp;
+    const toward = ((h.direction + 180) * Math.PI) / 180;
+    eastKm += Math.sin(toward) * ros;
+    northKm += Math.cos(toward) * ros;
+    const hour = i + 1;
+    if (hour % 2 === 0) drifts.push({ eastKm, northKm, hour });
+  });
+  if (drifts.length === 0) return null;
+
+  const features: GeoJSON.Feature[] = [];
+  const labels: Projection["labels"] = [];
+
+  clusters.forEach((cluster, ci) => {
+    const hull = convexHull(cluster.map((d) => [d.lon, d.lat]));
+    if (hull.length < 3) return;
+
+    const cLat = hull.reduce((s, p) => s + p[1], 0) / hull.length;
+    const cLon = hull.reduce((s, p) => s + p[0], 0) / hull.length;
+    const kmPerDegLon = KM_PER_DEG_LAT * Math.cos((cLat * Math.PI) / 180);
+
+    for (const { eastKm, northKm, hour } of drifts) {
+      const grow = 1 + 0.03 * hour;
+      const ring: [number, number][] = hull.map(([lon, lat]) => [
+        cLon + (lon - cLon) * grow + eastKm / kmPerDegLon,
+        cLat + (lat - cLat) * grow + northKm / KM_PER_DEG_LAT,
+      ]);
+      ring.push(ring[0]);
+
+      features.push({
+        type: "Feature",
+        geometry: { type: "Polygon", coordinates: [ring] },
+        properties: { h: hour },
+      });
+
+      // One label — the outermost front of the main fire. In light wind the
+      // rings sit close together and per-ring labels just stack unreadably;
+      // secondary ignitions keep their rings but stay untagged.
+      if (ci !== 0 || hour !== drifts[drifts.length - 1].hour) continue;
+      const driftLen = Math.hypot(eastKm, northKm) || 1;
+      const ux = eastKm / driftLen;
+      const uy = northKm / driftLen;
+      let best = ring[0];
+      let bestD = -Infinity;
+      for (const [lon, lat] of ring) {
+        const d =
+          (lon - cLon) * kmPerDegLon * ux +
+          (lat - cLat) * KM_PER_DEG_LAT * uy;
+        if (d > bestD) {
+          bestD = d;
+          best = [lon, lat];
+        }
+      }
+      labels.push({ lngLat: best, text: `+${hour} H` });
+    }
+  });
+
+  if (features.length === 0) return null;
+  return { fc: { type: "FeatureCollection", features }, labels };
+}
+
 /**
  * Wind barb pinned at the fire centroid, built as raw SVG markup so it can ride
  * inside a MapLibre DOM marker without a React root. Points the way the fire is
@@ -168,17 +357,27 @@ export default function FireMap({
   const ready = useRef(false);
   const barb = useRef<maplibregl.Marker | null>(null);
   const labels = useRef<maplibregl.Marker[]>([]);
+  const projLabels = useRef<maplibregl.Marker[]>([]);
+
+  const [showProj, setShowProj] = useState(true);
+  const showProjRef = useRef(showProj);
+  showProjRef.current = showProj;
 
   // The mount effect's `load` handler would otherwise close over the props
   // from the first render — both null — while the data effects bail out
   // because `ready` is still false. Whichever order the race resolves in, the
   // layers end up empty. A ref that always holds the current payload lets the
   // load handler read live data instead of a stale closure.
-  const latest = useRef<{ fire: FireData | null; traffic: TrafficData | null }>({
+  const latest = useRef<{
+    fire: FireData | null;
+    wind: WindData | null;
+    traffic: TrafficData | null;
+  }>({
     fire: null,
+    wind: null,
     traffic: null,
   });
-  latest.current = { fire, traffic };
+  latest.current = { fire, wind, traffic };
 
   const syncLayers = useCallback(() => {
     const m = map.current;
@@ -189,6 +388,27 @@ export default function FireMap({
     (m.getSource("traffic") as maplibregl.GeoJSONSource | undefined)?.setData(
       trafficGeoJson(latest.current.traffic),
     );
+
+    // Projection: data when enabled, empty when toggled off. Hour labels are
+    // DOM markers, managed alongside the layer data so they can never orphan.
+    const proj = showProjRef.current
+      ? windProjection(latest.current.fire, latest.current.wind)
+      : null;
+    (m.getSource("projection") as maplibregl.GeoJSONSource | undefined)?.setData(
+      proj?.fc ?? EMPTY,
+    );
+    for (const l of projLabels.current) l.remove();
+    projLabels.current = [];
+    for (const { lngLat, text } of proj?.labels ?? []) {
+      const el = document.createElement("div");
+      el.className = "proj-label";
+      el.textContent = text;
+      projLabels.current.push(
+        new maplibregl.Marker({ element: el, anchor: "center" })
+          .setLngLat(lngLat)
+          .addTo(m),
+      );
+    }
   }, []);
 
   useEffect(() => {
@@ -218,6 +438,42 @@ export default function FireMap({
     );
 
     m.on("load", () => {
+      // Projection envelope goes in first so it renders beneath the
+      // detections — a forecast must never visually outrank an observation.
+      m.addSource("projection", { type: "geojson", data: EMPTY });
+      m.addLayer({
+        id: "proj-fill",
+        type: "fill",
+        source: "projection",
+        paint: {
+          "fill-color": ACCENT,
+          "fill-opacity": [
+            "interpolate",
+            ["linear"],
+            ["get", "h"],
+            2, 0.05,
+            6, 0.02,
+          ],
+        },
+      });
+      m.addLayer({
+        id: "proj-line",
+        type: "line",
+        source: "projection",
+        paint: {
+          "line-color": ACCENT,
+          "line-width": 1.2,
+          "line-dasharray": [2, 2],
+          "line-opacity": [
+            "interpolate",
+            ["linear"],
+            ["get", "h"],
+            2, 0.65,
+            6, 0.28,
+          ],
+        },
+      });
+
       m.addSource("fire", { type: "geojson", data: EMPTY });
 
       // Soft heat wash under the dots so clusters read as one fire front
@@ -398,10 +654,11 @@ export default function FireMap({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Push new detections into the existing source without touching the camera.
+  // Push new data into the existing sources without touching the camera. The
+  // projection consumes fire + wind + the toggle, so all three re-sync.
   useEffect(() => {
     syncLayers();
-  }, [fire, syncLayers]);
+  }, [fire, wind, showProj, syncLayers]);
 
   // Aircraft positions, refreshed every poll. Firefighters additionally get a
   // DOM label so the callsign is readable in Plex Mono — a visible PELICAN
@@ -432,6 +689,8 @@ export default function FireMap({
     return () => {
       for (const l of labels.current) l.remove();
       labels.current = [];
+      for (const l of projLabels.current) l.remove();
+      projLabels.current = [];
     };
   }, []);
 
@@ -499,6 +758,31 @@ export default function FireMap({
           </svg>
           <span className="label">AUTRE TRAFIC</span>
         </div>
+        <button
+          type="button"
+          className="proj-toggle"
+          onClick={() => setShowProj((v) => !v)}
+          aria-pressed={showProj}
+        >
+          <svg width="14" height="9" viewBox="0 0 14 9" aria-hidden="true">
+            <line
+              x1="0"
+              y1="4.5"
+              x2="14"
+              y2="4.5"
+              stroke={ACCENT}
+              strokeWidth="1.4"
+              strokeDasharray="3 2"
+              opacity={showProj ? 1 : 0.35}
+            />
+          </svg>
+          PROJECTION VENT 6 H · {showProj ? "ON" : "OFF"}
+        </button>
+        {showProj ? (
+          <div className="label dim" style={{ maxWidth: "22ch", lineHeight: 1.6 }}>
+            ENVELOPPE INDICATIVE, HORS RELIEF ET COMBUSTIBLE
+          </div>
+        ) : null}
       </div>
     </>
   );

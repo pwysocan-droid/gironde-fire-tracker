@@ -77,6 +77,17 @@ The live module header names whichever provider answered. adsb.lol also
 reports the ICAO airframe type, which OpenSky does not.
 
 
+## Projection layer
+
+The map can overlay an indicative 6 h spread envelope (toggle in the legend,
+on by default): detections from the freshest stratum are clustered into
+distinct fires (single-linkage, 4 km), each cluster's convex hull is advected
+hour by hour along the Open-Meteo forecast wind and slightly inflated so the
+flanks widen as the head advances, and the +2/+4/+6 h fronts are drawn as
+dashed outlines. Head rate of spread is ~5 % of a gust-weighted wind speed,
+halved above 60 % humidity — a rule-of-thumb envelope, not a fire-behaviour
+model (no fuel, no terrain), and it is labelled as such on the page.
+
 ## Notes on the data
 
 - FIRMS returns two different CSV schemas — VIIRS reports `bright_ti4` and a
@@ -96,6 +107,11 @@ reports the ICAO airframe type, which OpenSky does not.
 - Wind direction is reported as the direction wind comes *from*. The fire is
   driven toward `direction + 180`, which is what the arrow and the
   plain-language reading both show.
+- Detection counts breathe with the satellite orbits, not only with the fire:
+  ~4 passes/day (≈ 01:30, 10:30, 13:30, 22:30 local) means the "<6 h" figure
+  decays mechanically through the morning, then jumps when the midday passes
+  land. Module 01 says so on the page — a morning dip is not the fire
+  shrinking.
 - Timestamps are stored UTC and displayed Europe/Paris throughout.
 
 ## Attribution

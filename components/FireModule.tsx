@@ -98,6 +98,25 @@ export default function FireModule({
             ) : null}
           </div>
 
+          {/* The counts breathe with the orbit, not only with the fire: no
+              new detections can arrive between satellite passes, so the <6 h
+              figure decays through the morning then jumps at the midday
+              overpasses. Say so, or the page reads as the fire shrinking. */}
+          <div
+            className="label dim"
+            style={{
+              marginTop: 10,
+              paddingTop: 8,
+              borderTop: "1px solid rgba(10,10,8,0.12)",
+              lineHeight: 1.6,
+              letterSpacing: "0.08em",
+            }}
+          >
+            ≈ 4 PASSAGES SATELLITE/JOUR (≈ 01H30 · 10H30 · 13H30 · 22H30).
+            ENTRE DEUX PASSAGES, LES COMPTEURS RETOMBENT MÉCANIQUEMENT — UNE
+            BAISSE MATINALE N&apos;EST PAS UN RECUL DU FEU.
+          </div>
+
           {d.sensorsFailed.length ? (
             <div className="label dim" style={{ marginTop: 9 }}>
               CAPTEUR HORS SERVICE : {d.sensorsFailed.join(", ")}

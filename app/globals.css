@@ -655,4 +655,17 @@ body {
   .stat-val {
     font-size: 34px;
   }
+
+  /* 95 % of the audience is on a phone, checking whether their town is at
+     risk: the plain-language bulletin (04) outranks the data modules there.
+     DOM order is unchanged — desktop keeps 01→04. */
+  .col-modules > .module:nth-child(4) {
+    order: -1;
+    border-bottom: var(--rule);
+  }
+
+  /* 03 becomes the visual last on mobile; drop its now-dangling rule. */
+  .col-modules > .module:nth-child(3) {
+    border-bottom: none;
+  }
 }

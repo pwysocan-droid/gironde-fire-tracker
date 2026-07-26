@@ -1,7 +1,9 @@
 "use client";
 
+import { useEffect, useRef } from "react";
 import Module from "./Module";
 import { parisTime } from "@/lib/format";
+import { trackOnce } from "@/lib/track";
 import type { SitrepData } from "@/lib/types";
 import type { SourceState } from "@/lib/useSource";
 
@@ -14,8 +16,28 @@ export default function SitrepModule({ src }: { src: SourceState<SitrepData> }) 
   const d = src.data;
   const down = !!src.error && !d;
 
+  // One deduped event when the bulletin has actually been on screen (60 %
+  // visible) with content — the number that validates putting 04 first on
+  // mobile. Wrapper div because Module doesn't expose a ref.
+  const holder = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!d || !holder.current) return;
+    const io = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((e) => e.isIntersecting)) {
+          trackOnce("bulletin_seen");
+          io.disconnect();
+        }
+      },
+      { threshold: 0.6 },
+    );
+    io.observe(holder.current);
+    return () => io.disconnect();
+  }, [d]);
+
   return (
-    <Module
+    <div ref={holder}>
+      <Module
       num="04"
       title="SITUATION"
       meta={d ? `GÉNÉRÉ ${parisTime(d.generatedAt)}` : "SYNTHÈSE IA"}
@@ -48,6 +70,7 @@ export default function SitrepModule({ src }: { src: SourceState<SitrepData> }) 
       ) : (
         <div className="label dim">GÉNÉRATION…</div>
       )}
-    </Module>
+      </Module>
+    </div>
   );
 }

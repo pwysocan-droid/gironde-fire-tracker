@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import maplibregl from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
 import { BBOX, BOD, FIRE_CENTROID } from "@/lib/constants";
+import { track, trackOnce } from "@/lib/track";
 import type { FireData, TrafficData, WindData } from "@/lib/types";
 
 /**
@@ -431,6 +432,11 @@ export default function FireMap({
       "top-right",
     );
 
+    // One deduped event when a session actually engages with the map —
+    // measures whether the map is interactive surface or backdrop.
+    m.once("zoomstart", () => trackOnce("map_interact"));
+    m.once("dragstart", () => trackOnce("map_interact"));
+
     // Scale matters on a fire map: it is how you read the width of the front.
     m.addControl(
       new maplibregl.ScaleControl({ maxWidth: 96, unit: "metric" }),
@@ -761,7 +767,12 @@ export default function FireMap({
         <button
           type="button"
           className="proj-toggle"
-          onClick={() => setShowProj((v) => !v)}
+          onClick={() =>
+            setShowProj((v) => {
+              track("projection_toggle", { state: v ? "off" : "on" });
+              return !v;
+            })
+          }
           aria-pressed={showProj}
         >
           <svg width="14" height="9" viewBox="0 0 14 9" aria-hidden="true">

@@ -47,6 +47,18 @@ the failures and the fixes.
   <img src="docs/screenshot-peak.png" alt="At the fire's peak — two ignitions, projection envelopes" width="560">
 </p>
 
+**Jul 24, the worst evening** — 755 detections in 6 h, 197 GW, and MILAN77
+(a Dash 8 Q400MR water bomber) crossing the map at 305 m on its way back to
+the fire line, while the Claude bulletin narrates below:
+
+![MILAN77 water bomber over the fire, Jul 24](docs/screenshot-jul24-milan77.png)
+
+**Jul 23, day one** — two contracted Air Tractor AT-802 water bombers
+(TRACTA, TRACKE) working the fire at under 600 m. Callsign matching missed
+them; the airframe-type detection added that day caught them:
+
+![Air Tractors working the fire line, Jul 23](docs/screenshot-jul23-airtractors.png)
+
 ## Two distinct events
 
 These are deliberately kept apart in the code and the UI:

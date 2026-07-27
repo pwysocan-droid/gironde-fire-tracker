@@ -1,10 +1,51 @@
 # SUIVI FEU / GIRONDE
 
-Single-page fire situation tracker for the active wildfire near
-Lège-Cap-Ferret, Gironde (July 2026). Live satellite detections, wind, and
-air traffic over one region of interest.
+![Desktop view — fire map, wind, aircraft, AI bulletin](docs/screenshot-desktop.png)
+
+Single-page fire situation tracker for the July 2026 wildfire near
+Lège-Cap-Ferret, Gironde. Live satellite detections, wind, water bombers,
+48 h history, and an AI-written French situation bulletin.
 
 **Production:** https://gironde-fire-tracker.vercel.app
+
+## The story
+
+This project was built almost entirely by [Claude Code](https://claude.com/claude-code)
+(Claude Fable 5), working from a design brief that was itself drafted with
+Claude from a one-sentence idea. The human contribution: the brief, API keys,
+a handful of authorizations, and two UX decisions. Everything else — code,
+debugging, deployment, and the decisions in between — was autonomous, with
+the whole first version live in under an hour.
+
+- **Jul 23** — Brief → scaffold → five phases built, visually QA'd (three
+  real bugs caught by screenshotting the running app), deployed to
+  production in ~45 minutes of unsupervised work. OpenSky turned out to be
+  unreachable from Vercel's egress; diagnosed live and swapped to adsb.lol,
+  which incidentally enabled airframe-type detection of the Air Tractor
+  water bombers that callsign matching missed.
+- **Jul 24** — "Why does the fire look smaller in the morning?" → satellite
+  sampling-cadence note + a wind-driven 6 h projection layer (per-fire
+  clustering added the same day, when a second ignition broke the naive
+  convex hull). Claude bulletin (module 04) and the history pipeline shipped
+  that evening; two Supabase dead-ends later, history landed on Vercel Blob.
+- **Jul 25–26** — The link spread through Bassin d'Arcachon Facebook and
+  Instagram groups: **11,296 visitors in 24 h**, ~93 % France, ~95 % mobile,
+  19–75 concurrently. Social preview card and mobile bulletin-first reorder
+  shipped in response.
+- **Jul 27** — **21,404 unique visitors in 72 h** — roughly the scale of the
+  evacuated and directly threatened population, ~2.5× the population of
+  Lège-Cap-Ferret itself. The same day, the tracker's own history modules
+  documented the fire's collapse: total radiative power down from 197 GW to
+  29 GW, measured spread 0.00 km/h.
+
+Total infrastructure cost: ~free-tier everything except ~$1–3/day of Claude
+API for the bulletin. The commit history is the honest build log — including
+the failures and the fixes.
+
+<p>
+  <img src="docs/screenshot-mobile.png" alt="Mobile view — bulletin-first" width="230">
+  <img src="docs/screenshot-peak.png" alt="At the fire's peak — two ignitions, projection envelopes" width="560">
+</p>
 
 ## Two distinct events
 

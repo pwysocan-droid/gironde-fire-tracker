@@ -4,9 +4,11 @@ name: history snapshot backstop
 # This cron only covers unwatched stretches — 30 min keeps a private repo
 # comfortably inside the free Actions allowance, and the endpoint's
 # min-interval guard dedupes against the opportunistic path.
+# Schedule disabled while the tracker is paused (fire out, Aug 2026).
+# Re-enable by uncommenting the schedule block below.
 on:
-  schedule:
-    - cron: "*/30 * * * *"
+  # schedule:
+  #   - cron: "*/30 * * * *"
   workflow_dispatch:
 
 jobs:

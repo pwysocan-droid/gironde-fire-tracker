@@ -33,6 +33,13 @@ export function useSource<T>(
   const abort = useRef<AbortController | null>(null);
 
   const load = useCallback(async () => {
+    // Empty url = source disabled (paused mode). Fetching "" would request the
+    // page itself and try to parse HTML as JSON.
+    if (!url) {
+      setState((s) => ({ ...s, loading: false }));
+      return;
+    }
+
     abort.current?.abort();
     const ac = new AbortController();
     abort.current = ac;
@@ -73,6 +80,13 @@ export function useSource<T>(
 
   useEffect(() => {
     load();
+
+    // intervalMs <= 0 means "fetch once, never poll" — paused mode, where the
+    // page is an archive and every extra request is pure waste.
+    if (intervalMs <= 0) {
+      return () => abort.current?.abort();
+    }
+
     const id = setInterval(load, intervalMs);
 
     // Catch up immediately when a backgrounded tab returns to the foreground.

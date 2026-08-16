@@ -4,6 +4,7 @@ import { GET as fireGET } from "@/app/api/fire/route";
 import { GET as windGET } from "@/app/api/wind/route";
 import { GET as trafficGET } from "@/app/api/traffic/route";
 import { GET as historyGET } from "@/app/api/history/route";
+import { PAUSED } from "@/lib/constants";
 import { compass } from "@/lib/format";
 import type {
   Envelope,
@@ -128,6 +129,18 @@ function summarize(
 
 export async function GET() {
   const fetchedAt = new Date().toISOString();
+
+  // Paused: the UI does not render module 04 at all, but direct hits and
+  // crawlers still reach this route — refuse before spending anything.
+  if (PAUSED) {
+    const body: Envelope<SitrepData> = {
+      status: "down",
+      fetchedAt,
+      error: "suivi en pause",
+      data: null,
+    };
+    return NextResponse.json(body, { status: 200 });
+  }
 
   if (!process.env.ANTHROPIC_API_KEY) {
     const body: Envelope<SitrepData> = {

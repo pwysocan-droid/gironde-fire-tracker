@@ -1,8 +1,9 @@
 import Dashboard from "@/components/Dashboard";
+import { PAUSED } from "@/lib/constants";
 
 export default function Page() {
   return (
-    <main className="frame">
+    <main className={`frame${PAUSED ? " is-paused" : ""}`}>
       <Dashboard />
 
       <footer className="footer">

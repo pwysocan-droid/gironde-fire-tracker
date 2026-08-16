@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { CACHE, FIRE_CENTROID, TZ } from "@/lib/constants";
+import { CACHE, FIRE_CENTROID, PAUSED, TZ } from "@/lib/constants";
 import { compass } from "@/lib/format";
 import type { Envelope, WindData, WindHour } from "@/lib/types";
 
@@ -31,6 +31,18 @@ const AIR_URL =
 function reading(fromDeg: number, speed: number, gust: number, rh: number | null): string {
   const toward = (fromDeg + 180) % 360;
   const src = compass(fromDeg);
+
+  // Paused: there is no active fire, so the whole "feu poussé vers…" framing
+  // would assert something untrue. Describe the wind and nothing more.
+  if (PAUSED) {
+    const parts = [`Vent de ${src}, ${Math.round(speed)} km/h.`];
+    if (gust >= 30) parts.push(`Rafales à ${Math.round(gust)} km/h.`);
+    if (rh !== null && rh <= 30) {
+      parts.push(`Humidité ${Math.round(rh)} % — végétation sèche.`);
+    }
+    parts.push("Aucun foyer actif détecté dans le secteur.");
+    return parts.join(" ");
+  }
 
   // Where the fire is driven, in terms of what is actually at risk.
   let target: string;

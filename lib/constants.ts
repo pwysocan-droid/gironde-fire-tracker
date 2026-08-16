@@ -62,3 +62,19 @@ export const CACHE = {
   meteo: 900, // 15 min
   opensky: 60, // 60 s — anonymous access is credit-limited
 } as const;
+
+/**
+ * Paused mode. The fire was declared out in early August 2026; leaving the
+ * tracker polling five upstreams and paying for a Claude bulletin every
+ * quarter-hour serves nobody. When paused the page keeps its final state on
+ * screen as an archive, stops all client polling, and skips the paid and
+ * scheduled work — but the URL 21 000 people bookmarked still resolves, and
+ * still points them at the official channels.
+ *
+ * Flip with the NEXT_PUBLIC_TRACKER_PAUSED env var (Vercel → Settings →
+ * Environment Variables → redeploy). "0" or unset resumes live tracking.
+ */
+export const PAUSED = process.env.NEXT_PUBLIC_TRACKER_PAUSED === "1";
+
+/** Shown in the paused notice. Kept here so the copy has one source of truth. */
+export const PAUSED_SINCE = "2026-08-16";

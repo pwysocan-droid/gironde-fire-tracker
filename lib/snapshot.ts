@@ -1,6 +1,7 @@
 import { GET as fireGET } from "@/app/api/fire/route";
 import { GET as windGET } from "@/app/api/wind/route";
 import { GET as trafficGET } from "@/app/api/traffic/route";
+import { PAUSED } from "./constants";
 import { appendSnapshot, historyConfigured, readHistory } from "./store";
 import type {
   Envelope,
@@ -21,6 +22,12 @@ const MIN_INTERVAL_MS = 12 * 60 * 1000;
 export async function takeSnapshot(): Promise<
   { taken: true; at: string } | { taken: false; reason: string }
 > {
+  // Paused: the archive is frozen deliberately — appending flat rows would
+  // dilute the record of the fire with weeks of zeroes.
+  if (PAUSED) {
+    return { taken: false, reason: "suivi en pause" };
+  }
+
   if (!historyConfigured()) {
     return { taken: false, reason: "historique non configuré (BLOB_READ_WRITE_TOKEN)" };
   }

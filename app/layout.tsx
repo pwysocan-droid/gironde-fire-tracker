@@ -1,19 +1,28 @@
 import type { Metadata, Viewport } from "next";
 import { Analytics } from "@vercel/analytics/next";
 import { SpeedInsights } from "@vercel/speed-insights/next";
+import { PAUSED } from "@/lib/constants";
 import "./globals.css";
 
-const DESCRIPTION =
-  "Suivi en direct de l'incendie de Lège-Cap-Ferret (Gironde) : détections " +
-  "satellite NASA FIRMS, vent et prévisions, bombardiers d'eau en vol, " +
-  "bulletin de situation actualisé. Données publiques, non officielles.";
+// Shared links must not advertise live monitoring once it has stopped.
+const DESCRIPTION = PAUSED
+  ? "Suivi en pause : l'incendie de Lège-Cap-Ferret est éteint et cette page " +
+    "n'est plus surveillée. Informations officielles : préfecture de la " +
+    "Gironde. Urgences : 18 ou 112."
+  : "Suivi en direct de l'incendie de Lège-Cap-Ferret (Gironde) : détections " +
+    "satellite NASA FIRMS, vent et prévisions, bombardiers d'eau en vol, " +
+    "bulletin de situation actualisé. Données publiques, non officielles.";
+
+const OG_TITLE = PAUSED
+  ? "SUIVI FEU / GIRONDE — suivi en pause, incendie éteint"
+  : "SUIVI FEU / GIRONDE — incendie de Lège-Cap-Ferret en direct";
 
 export const metadata: Metadata = {
   metadataBase: new URL("https://gironde-fire-tracker.vercel.app"),
-  title: "SUIVI FEU — GIRONDE",
+  title: PAUSED ? "SUIVI FEU — GIRONDE (EN PAUSE)" : "SUIVI FEU — GIRONDE",
   description: DESCRIPTION,
   openGraph: {
-    title: "SUIVI FEU / GIRONDE — incendie de Lège-Cap-Ferret en direct",
+    title: OG_TITLE,
     description: DESCRIPTION,
     url: "/",
     siteName: "Suivi Feu Gironde",
@@ -30,7 +39,7 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: "summary_large_image",
-    title: "SUIVI FEU / GIRONDE — incendie de Lège-Cap-Ferret en direct",
+    title: OG_TITLE,
     description: DESCRIPTION,
     images: ["/og.png"],
   },
